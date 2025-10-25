@@ -83,5 +83,3 @@ class TestBasicRouting:
         
         assert result["agent_id"] == AgentType.VOICE_SCHEDULER.value
         assert result["confidence"] > 0.8
-    
-    @pytest.mark.asyncio

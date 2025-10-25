@@ -10,8 +10,8 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
-# Import your router
-from api.routers import router_endpoints
+# Import routers
+from api.routers import router_endpoints, orchestrator_endpoints, specialist_endpoints
 
 
 # Lifespan context manager for startup/shutdown events
@@ -85,11 +85,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include your router
+# Include routers
 app.include_router(
     router_endpoints.router,
     prefix="/api/router",
     tags=["Task Router"]
+)
+
+app.include_router(
+    orchestrator_endpoints.router,
+    prefix="/api/orchestrator",
+    tags=["Orchestrator"]
+)
+
+app.include_router(
+    specialist_endpoints.router,
+    prefix="/api/specialists",
+    tags=["AI Specialists"]
 )
 
 # Root endpoint
