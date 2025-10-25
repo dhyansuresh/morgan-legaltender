@@ -1,1 +1,8 @@
+fastapi
+uvicorn[standard]==0.22.0
+pydantic
+pytest==7.4.0
+httpx==0.24.1
+python-dotenv==1.1.1
+
 
