@@ -1,1 +1,39 @@
+# Core FastAPI Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
 
+# AI/ML Libraries
+anthropic==0.18.1
+openai==1.12.0
+google-generativeai==0.3.2
+
+# Database
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Redis (for caching and task queue)
+redis==5.0.1
+celery==5.3.6
+
+# HTTP Client
+httpx==0.26.0
+aiohttp==3.9.1
+
+# Environment Variables
+python-dotenv==1.0.1
+
+# Validation
+email-validator==2.1.0
+
+# Testing
+pytest==8.0.0
+pytest-asyncio==0.23.2
+httpx==0.26.0  # for testing async endpoints
+
+# Development
+black==24.1.1
+flake8==7.0.0
+mypy==1.8.0
