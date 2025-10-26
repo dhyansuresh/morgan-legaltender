@@ -49,6 +49,20 @@ class RecordsWrangler:
 
     def __init__(self, llm_adapter: Optional[RecordsAdapter] = None):
         self.llm = llm_adapter or MockRecordsAdapter()
+        
+        # Set Gemini system instruction if using GeminiAdapter
+        if self.llm and hasattr(self.llm, 'set_system_instruction'):
+            self.llm.set_system_instruction(
+                """You are a medical records specialist for a personal injury law firm.
+                Your expertise includes:
+                - Drafting HIPAA-compliant medical record requests
+                - Identifying missing medical documentation
+                - Communicating professionally with medical providers
+                - Understanding medical billing and treatment records
+                
+                Always maintain professional tone, ensure compliance with privacy laws,
+                and provide clear, actionable documentation requests."""
+            )
 
     def _identify_providers(self, text: str) -> List[Dict[str, Any]]:
         """

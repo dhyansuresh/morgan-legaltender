@@ -18,8 +18,7 @@ router = APIRouter()
 
 # Initialize services
 document_processor = DocumentProcessor()
-task_router = TaskRouter()
-orchestrator = TenderOrchestrator(task_router=task_router)
+orchestrator = TenderOrchestrator(use_ai_routing=True)
 
 
 class DocumentProcessResponse(BaseModel):

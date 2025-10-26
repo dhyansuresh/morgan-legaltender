@@ -54,6 +54,20 @@ class VoiceScheduler:
 
     def __init__(self, llm_adapter: Optional[SchedulerAdapter] = None):
         self.llm = llm_adapter or MockSchedulerAdapter()
+        
+        # Set Gemini system instruction if using GeminiAdapter
+        if self.llm and hasattr(self.llm, 'set_system_instruction'):
+            self.llm.set_system_instruction(
+                """You are a professional scheduling coordinator for a law firm.
+                Your expertise includes:
+                - Coordinating depositions, mediations, and legal appointments
+                - Drafting clear, professional scheduling messages
+                - Managing calendars and availability
+                - Ensuring all parties are properly informed
+                
+                Always be professional, clear about dates and times, and provide
+                multiple options when appropriate. Confirm all details explicitly."""
+            )
 
     def _extract_appointment_type(self, text: str) -> str:
         """

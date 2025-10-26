@@ -17,6 +17,7 @@ import re
 import os
 
 from .advanced_router import TaskRouter, TaskType, AgentType
+from .gemini_router import GeminiTaskRouter
 
 
 class SourceType(str, Enum):
@@ -51,14 +52,20 @@ class TenderOrchestrator:
     - Enforces HUMAN_APPROVAL gate
     """
 
-    def __init__(self, task_router: Optional[TaskRouter] = None):
+    def __init__(self, task_router: Optional[TaskRouter] = None, use_ai_routing: bool = True):
         """
         Initialize the orchestrator
 
         Args:
             task_router: Task router instance (creates new if not provided)
+            use_ai_routing: Whether to use Gemini AI for intelligent routing (default: True)
         """
-        self.task_router = task_router or TaskRouter()
+        # Use Gemini-powered router if available, otherwise fall back to rule-based
+        if task_router is None and use_ai_routing:
+            self.task_router = GeminiTaskRouter(use_ai_routing=True)
+        else:
+            self.task_router = task_router or TaskRouter()
+
         self.processing_history = []
 
         # Initialize specialists with Gemini
@@ -148,6 +155,12 @@ class TenderOrchestrator:
             entities
         )
 
+        # Step 6.5: If no tasks detected, use Gemini for general Q&A
+        if len(detected_tasks) == 0:
+            general_response = await self._handle_general_question(normalized, entities)
+            if general_response:
+                specialist_responses.append(general_response)
+
         # Step 7: Determine if human approval is required
         approval_status = self._determine_approval_requirement(
             detected_tasks,
@@ -190,6 +203,71 @@ class TenderOrchestrator:
         self._record_processing(response)
 
         return response
+
+    async def _handle_general_question(
+        self,
+        text: str,
+        entities: Dict[str, List[str]]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Handle general questions using Gemini when no specific tasks are detected
+
+        Args:
+            text: The user's question/input
+            entities: Extracted entities from the text
+
+        Returns:
+            A specialist response dict with Gemini's answer, or None if unavailable
+        """
+        try:
+            from app.specialists.gemini_adapter import GeminiAdapter
+            import os
+
+            api_key = os.getenv("GOOGLE_AI_API_KEY")
+            if not api_key:
+                return None
+
+            # Create a Gemini adapter for general Q&A
+            gemini = GeminiAdapter(api_key=api_key)
+            gemini.set_system_instruction(
+                "You are a knowledgeable legal assistant for a personal injury law firm. "
+                "Answer legal questions clearly and professionally. Provide helpful information "
+                "about legal concepts, processes, and general guidance. If the question is about "
+                "a specific case, remind the user that you can provide general information but "
+                "specific legal advice requires consultation with their attorney. Keep responses "
+                "concise but thorough."
+            )
+
+            # Build context from entities if available
+            context_parts = []
+            if entities.get("legal_terms"):
+                context_parts.append(f"Legal context: {', '.join(entities['legal_terms'])}")
+            if entities.get("medical_terms"):
+                context_parts.append(f"Medical context: {', '.join(entities['medical_terms'])}")
+
+            context = "\n".join(context_parts) if context_parts else ""
+
+            # Create prompt
+            prompt = f"{context}\n\nQuestion: {text}" if context else text
+
+            # Get Gemini response
+            response_text = await gemini.complete(prompt)
+
+            return {
+                "task_id": "GENERAL-Q&A",
+                "agent_id": "general_assistant",
+                "agent_name": "Legal Assistant (General Q&A)",
+                "response": {
+                    "answer": response_text,
+                    "question": text,
+                    "type": "general_question"
+                },
+                "status": "success"
+            }
+
+        except Exception as e:
+            print(f"⚠️ General Q&A failed: {e}")
+            return None
 
     async def _execute_specialists(
         self,
@@ -483,23 +561,30 @@ class TenderOrchestrator:
                 r'\bmedical\s+(?:records|bills|documentation)\b'
             ],
             TaskType.SCHEDULE_APPOINTMENT: [
-                r'\b(?:schedule|book|set up|arrange)\s+(?:an?\s+)?(?:appointment|meeting|deposition|mediation)\b',
+                r'\b(?:schedule|book|set up|arrange)\s+(?:an?\s+)?(?:appointment|meeting|deposition|mediation|zoom|call|consultation)\b',
                 r'\bneed\s+to\s+(?:see|meet|speak with)\b',
-                r'\bwhen\s+can\s+(?:we|I)\s+meet\b'
+                r'\bwhen\s+can\s+(?:we|I)\s+meet\b',
+                r'\b(?:zoom|teams|video)\s+(?:meeting|appointment|call)\b'
             ],
             TaskType.CLIENT_COMMUNICATION: [
+                r'\b(?:email|message|contact|call|reach out|notify)\s+(?:client|about|regarding)\b',
                 r'\b(?:update|let me know|inform|tell|status|what\'s happening)\b',
                 r'\b(?:question|confused|wondering|clarify)\b',
-                r'\bhow\s+is\s+(?:my|the)\s+case\b'
+                r'\bhow\s+is\s+(?:my|the)\s+case\b',
+                r'\b(?:send|forward|reply)\s+(?:email|message)\b',
+                r'\b(?:draft|write|compose|create|give me)\s+(?:email|message|communication|letter)\b',
+                r'\b(?:check in|follow up|reach out|touch base)\b',
+                r'\bletter\s+(?:to|for)\b'
             ],
             TaskType.LEGAL_RESEARCH: [
                 r'\b(?:precedent|case law|similar cases|statute|regulation)\b',
                 r'\b(?:liability|negligence|duty|breach)\b',
-                r'\blegal\s+(?:basis|theory|argument)\b'
+                r'\blegal\s+(?:basis|theory|argument)\b',
+                r'\b(?:research|find|look up)\s+(?:case|law|statute)\b'
             ],
             TaskType.DRAFT_LETTER: [
                 r'\b(?:demand|settlement|offer|proposal)\s+letter\b',
-                r'\b(?:draft|prepare|write)\s+(?:a\s+)?(?:letter|response|reply)\b'
+                r'\b(?:draft|prepare|write|create)\s+(?:a\s+)?(?:letter|response|reply|document)\b'
             ],
             TaskType.DOCUMENT_ORGANIZATION: [
                 r'\b(?:organize|sort|file|categorize)\s+(?:documents|files|attachments)\b',

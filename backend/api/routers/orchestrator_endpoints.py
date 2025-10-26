@@ -20,9 +20,9 @@ from orchestrator.advanced_router import TaskRouter
 
 router = APIRouter()
 
-# Initialize orchestrator
-task_router = TaskRouter()
-orchestrator = TenderOrchestrator(task_router=task_router)
+# Initialize orchestrator with Gemini-powered routing
+# The orchestrator will automatically use GeminiTaskRouter if use_ai_routing=True
+orchestrator = TenderOrchestrator(use_ai_routing=True)
 
 
 # Request/Response Models

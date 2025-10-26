@@ -2,6 +2,7 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from enum import Enum
+import os
 
 
 class TaskType(str, Enum):
@@ -28,16 +29,46 @@ class AgentType(str, Enum):
 
 class TaskRouter:
     """
-    Intelligent task router that assigns tasks to the most appropriate AI specialist
+    Intelligent task router powered by Google Gemini AI
     
     Features:
+    - AI-powered task analysis and routing decisions
     - Task type matching
     - Load balancing across agents
     - Priority-based routing
     - Agent availability checking
+    - Intelligent fallback routing
     """
     
-    def __init__(self):
+    def __init__(self, llm_adapter=None):
+        # Import here to avoid circular dependency
+        from app.specialists.gemini_adapter import GeminiAdapter
+        
+        # Initialize Gemini adapter for intelligent routing
+        self.llm = llm_adapter
+        if not self.llm:
+            try:
+                api_key = os.getenv("GOOGLE_AI_API_KEY")
+                if api_key:
+                    self.llm = GeminiAdapter(
+                        api_key=api_key,
+                        system_instruction="""You are an intelligent task routing system for a legal AI platform.
+                        Your role is to analyze task descriptions and determine the best AI specialist to handle each task.
+                        
+                        Available specialists:
+                        - Records Wrangler: Handles medical records, billing documents, provider outreach
+                        - Communication Guru: Drafts client messages, status updates, empathetic responses
+                        - Legal Researcher: Finds case law, legal citations, precedent analysis
+                        - Voice Scheduler: Coordinates depositions, mediations, appointments
+                        - Evidence Sorter: Organizes documents, categorizes files, manages attachments
+                        
+                        Provide clear, confident routing decisions with brief reasoning."""
+                    )
+                    print("✓ TaskRouter using Gemini for intelligent routing")
+            except Exception as e:
+                print(f"⚠ TaskRouter: Could not initialize Gemini - using rule-based routing: {e}")
+                self.llm = None
+        
         # Define routing rules: task_type -> preferred agent
         self.routing_rules = {
             TaskType.RETRIEVE_RECORDS: AgentType.RECORDS_WRANGLER,
@@ -133,6 +164,71 @@ class TaskRouter:
         # Track routing history for analytics
         self.routing_history = []
     
+    async def _gemini_route_task(
+        self,
+        task: Dict[str, Any]
+    ) -> Optional[AgentType]:
+        """
+        Use Gemini AI to intelligently route the task
+        
+        Args:
+            task: Task dictionary with description and details
+            
+        Returns:
+            Recommended AgentType or None if unable to determine
+        """
+        if not self.llm:
+            return None
+            
+        try:
+            task_desc = task.get("description", "")
+            task_type = task.get("task_type", "")
+            extracted_data = task.get("extracted_data", {})
+            priority = task.get("priority", "medium")
+            
+            prompt = f"""
+            Analyze this task and determine which AI specialist should handle it.
+            
+            Task Type: {task_type}
+            Description: {task_desc}
+            Priority: {priority}
+            Additional Context: {str(extracted_data)[:200]}
+            
+            Available specialists:
+            1. records_wrangler - Medical records, billing, provider outreach
+            2. communication_guru - Client messages, empathetic communication
+            3. legal_researcher - Legal research, case law, citations
+            4. voice_scheduler - Scheduling appointments, depositions, meetings
+            5. evidence_sorter - Document organization, file categorization
+            
+            Respond with ONLY the specialist ID (e.g., "records_wrangler") and a brief one-sentence reason.
+            Format: [specialist_id]: [reason]
+            """
+            
+            response = await self.llm.complete(prompt)
+            
+            # Parse response
+            response_lower = response.lower().strip()
+            
+            # Map to AgentType
+            agent_mapping = {
+                "records_wrangler": AgentType.RECORDS_WRANGLER,
+                "communication_guru": AgentType.COMMUNICATION_GURU,
+                "legal_researcher": AgentType.LEGAL_RESEARCHER,
+                "voice_scheduler": AgentType.VOICE_SCHEDULER,
+                "evidence_sorter": AgentType.EVIDENCE_SORTER
+            }
+            
+            for agent_key, agent_type in agent_mapping.items():
+                if agent_key in response_lower:
+                    return agent_type
+            
+            return None
+            
+        except Exception as e:
+            print(f"⚠ Gemini routing error: {e}")
+            return None
+    
     async def route_task(
         self,
         task: Dict[str, Any],
@@ -160,8 +256,12 @@ class TaskRouter:
         task_type = task.get("task_type")
         priority = task.get("priority", "medium")
         
-        # Get primary agent based on task type
-        primary_agent_id = self._get_primary_agent(task_type)
+        # Try Gemini-powered intelligent routing first
+        primary_agent_id = await self._gemini_route_task(task)
+        
+        # Fall back to rule-based routing if Gemini unavailable or failed
+        if primary_agent_id is None:
+            primary_agent_id = self._get_primary_agent(task_type)
         
         # Check if primary agent is available
         if consider_load:

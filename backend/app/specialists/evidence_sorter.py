@@ -50,6 +50,20 @@ class EvidenceSorter:
 
     def __init__(self, llm_adapter: Optional[EvidenceSorterAdapter] = None):
         self.llm = llm_adapter or MockEvidenceSorterAdapter()
+        
+        # Set Gemini system instruction if using GeminiAdapter
+        if self.llm and hasattr(self.llm, 'set_system_instruction'):
+            self.llm.set_system_instruction(
+                """You are a document management and organization specialist for a law firm.
+                Your expertise includes:
+                - Classifying legal documents by type and category
+                - Extracting key information and metadata from documents
+                - Organizing case files efficiently
+                - Understanding legal document hierarchies and filing systems
+                
+                Always provide clear categorization, identify key dates and amounts,
+                and suggest logical filing structures for case management systems."""
+            )
 
         # Document category definitions
         self.document_categories = {

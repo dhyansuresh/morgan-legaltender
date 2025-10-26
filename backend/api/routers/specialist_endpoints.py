@@ -34,9 +34,9 @@ def get_llm_adapter():
 
 # Initialize specialists with Gemini
 llm_adapter = get_llm_adapter()
-records_wrangler = RecordsWrangler()
-voice_scheduler = VoiceScheduler()
-evidence_sorter = EvidenceSorter()
+records_wrangler = RecordsWrangler(llm_adapter=llm_adapter)
+voice_scheduler = VoiceScheduler(llm_adapter=llm_adapter)
+evidence_sorter = EvidenceSorter(llm_adapter=llm_adapter)
 legal_researcher = LegalResearcher(llm_adapter=llm_adapter)
 client_communicator = ClientCommunicator(llm_adapter=llm_adapter)
 
