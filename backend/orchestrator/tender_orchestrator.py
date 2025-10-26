@@ -14,6 +14,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from enum import Enum
 import re
+import os
 
 from .advanced_router import TaskRouter, TaskType, AgentType
 
@@ -59,6 +60,36 @@ class TenderOrchestrator:
         """
         self.task_router = task_router or TaskRouter()
         self.processing_history = []
+
+        # Initialize specialists with Gemini
+        self._initialize_specialists()
+
+    def _initialize_specialists(self):
+        """Initialize AI specialists with Gemini adapter"""
+        from app.specialists.gemini_adapter import GeminiAdapter
+        from app.specialists.legal_researcher import LegalResearcher
+        from app.specialists.client_communication import ClientCommunicator
+        from app.specialists.records_wrangler import RecordsWrangler
+        from app.specialists.voice_scheduler import VoiceScheduler
+        from app.specialists.evidence_sorter import EvidenceSorter
+
+        # Get Gemini API key
+        google_api_key = os.getenv("GOOGLE_AI_API_KEY")
+
+        # Initialize Gemini adapter
+        llm_adapter = None
+        if google_api_key:
+            llm_adapter = GeminiAdapter(api_key=google_api_key)
+            print("✓ Orchestrator initialized with Gemini")
+        else:
+            print("⚠ No GOOGLE_AI_API_KEY found - specialists will use mock responses")
+
+        # Initialize specialists
+        self.legal_researcher = LegalResearcher(llm_adapter=llm_adapter)
+        self.client_communicator = ClientCommunicator(llm_adapter=llm_adapter)
+        self.records_wrangler = RecordsWrangler()
+        self.voice_scheduler = VoiceScheduler()
+        self.evidence_sorter = EvidenceSorter()
 
     async def process_input(
         self,
@@ -109,17 +140,26 @@ class TenderOrchestrator:
             routing = await self.task_router.route_task(task)
             routing_decisions.append(routing)
 
-        # Step 6: Determine if human approval is required
+        # Step 6: Execute specialists and get AI responses
+        specialist_responses = await self._execute_specialists(
+            detected_tasks,
+            routing_decisions,
+            normalized,
+            entities
+        )
+
+        # Step 7: Determine if human approval is required
         approval_status = self._determine_approval_requirement(
             detected_tasks,
             routing_decisions
         )
 
-        # Step 7: Generate proposed actions/artifacts
+        # Step 8: Generate proposed actions/artifacts
         proposed_actions = self._generate_proposed_actions(
             detected_tasks,
             routing_decisions,
-            entities
+            entities,
+            specialist_responses
         )
 
         # Build comprehensive response
@@ -139,6 +179,7 @@ class TenderOrchestrator:
             "pii_phi_labels": pii_labels,
             "detected_tasks": detected_tasks,
             "routing_decisions": routing_decisions,
+            "specialist_responses": specialist_responses,
             "approval_required": approval_status,
             "proposed_actions": proposed_actions,
             "metadata": metadata,
@@ -149,6 +190,90 @@ class TenderOrchestrator:
         self._record_processing(response)
 
         return response
+
+    async def _execute_specialists(
+        self,
+        tasks: List[Dict[str, Any]],
+        routing_decisions: List[Dict[str, Any]],
+        text: str,
+        entities: Dict[str, List[str]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Execute the appropriate specialists and get AI-generated responses
+
+        Args:
+            tasks: Detected tasks
+            routing_decisions: Routing decisions for each task
+            text: Normalized text
+            entities: Extracted entities
+
+        Returns:
+            List of specialist responses with AI-generated content
+        """
+        specialist_responses = []
+
+        for task, routing in zip(tasks, routing_decisions):
+            task_type = task.get("task_type")
+            agent_id = routing.get("agent_id")
+
+            try:
+                response = None
+
+                # Call the appropriate specialist based on agent_id
+                if agent_id == AgentType.LEGAL_RESEARCHER.value:
+                    response = await self.legal_researcher.analyze(
+                        text=text,
+                        metadata=task.get("extracted_data", {})
+                    )
+
+                elif agent_id == AgentType.COMMUNICATION_GURU.value:
+                    # Extract client name if available
+                    client_name = entities.get("names", [None])[0] if entities.get("names") else None
+                    response = await self.client_communicator.draft(
+                        client_name=client_name,
+                        purpose=task_type,
+                        text=text
+                    )
+
+                elif agent_id == AgentType.RECORDS_WRANGLER.value:
+                    response = await self.records_wrangler.analyze_records_needs(
+                        text=text,
+                        case_id=None,
+                        existing_records=[]
+                    )
+
+                elif agent_id == AgentType.VOICE_SCHEDULER.value:
+                    response = await self.voice_scheduler.parse_scheduling_request(
+                        text=text,
+                        case_id=None
+                    )
+
+                elif agent_id == AgentType.EVIDENCE_SORTER.value:
+                    # Evidence sorter typically processes documents
+                    # For now, return a placeholder
+                    response = {
+                        "message": "Evidence Sorter requires document attachments to process"
+                    }
+
+                specialist_responses.append({
+                    "task_id": task.get("id"),
+                    "agent_id": agent_id,
+                    "agent_name": routing.get("agent_name"),
+                    "response": response,
+                    "status": "success"
+                })
+
+            except Exception as e:
+                specialist_responses.append({
+                    "task_id": task.get("id"),
+                    "agent_id": agent_id,
+                    "agent_name": routing.get("agent_name"),
+                    "response": None,
+                    "status": "error",
+                    "error": str(e)
+                })
+
+        return specialist_responses
 
     def _normalize_text(self, text: str, source_type: SourceType) -> str:
         """
@@ -584,7 +709,8 @@ class TenderOrchestrator:
         self,
         tasks: List[Dict[str, Any]],
         routing_decisions: List[Dict[str, Any]],
-        entities: Dict[str, List[str]]
+        entities: Dict[str, List[str]],
+        specialist_responses: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
         Generate proposed actions/artifacts for human review
@@ -593,15 +719,16 @@ class TenderOrchestrator:
         """
         proposed = []
 
-        for task, routing in zip(tasks, routing_decisions):
+        for task, routing, spec_response in zip(tasks, routing_decisions, specialist_responses):
             action = {
                 "task_id": task["id"],
                 "action_type": task["task_type"],
                 "assigned_agent": routing["agent_name"],
                 "confidence": routing["confidence"],
                 "status": ApprovalStatus.PENDING.value,
+                "ai_generated_response": spec_response.get("response"),
                 "proposed_artifact": self._generate_draft_artifact(task, entities),
-                "approval_note": "⚠️ Requires human approval before execution"
+                "approval_note": "✓ AI has generated a response. Review before sending to client."
             }
             proposed.append(action)
 

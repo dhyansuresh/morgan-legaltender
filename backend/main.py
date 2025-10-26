@@ -27,10 +27,10 @@ async def lifespan(app: FastAPI):
     print("=" * 60)
     print("Starting Morgan Legal Tender - Task Router API")
     print("=" * 60)
-    print(f"📅 Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"📝 Environment: {os.getenv('ENVIRONMENT', 'development')}")
-    print(f"🤖 Primary AI Model: {os.getenv('PRIMARY_AI_MODEL', 'claude-sonnet-4-5-20250929')}")
-    print(f"🔌 API Docs: http://localhost:{os.getenv('PORT', '8000')}/docs")
+    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    print(f"Primary AI Model: {os.getenv('PRIMARY_AI_MODEL', 'claude-sonnet-4-5-20250929')}")
+    print(f"API Docs: http://localhost:{os.getenv('PORT', '8000')}/docs")
     print("=" * 60)
     
     # Initialize database connection pool, Redis, etc. (if needed later)
@@ -243,12 +243,12 @@ if __name__ == "__main__":
     print(f"\n🚀 Starting server on {host}:{port}")
     print(f"📚 Documentation: http://localhost:{port}/docs\n")
     
+    # Disable auto-reload to prevent .venv file watching issues
+    # If you need auto-reload, manually restart the server after changes
     uvicorn.run(
         "main:app",
         host=host,
         port=port,
-        reload=reload,
-        reload_dirs=["./api", "./app", "./orchestrator"] if reload else None,
-        reload_excludes=["./venv/*", "./.venv/*", "**/venv/*", "**/.venv/*"] if reload else None,
+        reload=False,  # Disabled to prevent .venv watching issues
         log_level="info"
     )

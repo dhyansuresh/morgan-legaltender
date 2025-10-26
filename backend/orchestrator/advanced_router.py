@@ -136,7 +136,7 @@ class TaskRouter:
     async def route_task(
         self,
         task: Dict[str, Any],
-        consider_load: bool = True
+        consider_load: bool = False
     ) -> Dict[str, Any]:
         """
         Route a task to the most appropriate AI specialist

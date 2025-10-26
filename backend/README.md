@@ -6,13 +6,15 @@ Quick run (development):
 
 1. Create and activate a virtual environment (recommended):
 
-```powershell
-cd C:\Users\ctiriveedhi\morgan-legaltender\backend
-python -m venv .venv
-. .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m uvicorn app.main:app --reload --port 8000
+```bash
+cd morgan-legaltender/backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
+python main.py
+# Or use uvicorn directly:
+# python -m uvicorn main:app --reload --port 8000
 ```
 
 Endpoint:
@@ -28,9 +30,11 @@ Using a real LLM provider
 
   Example (PowerShell):
 
-  ```powershell
-  $env:OPENAI_API_KEY = "sk-..."
-  python -m uvicorn app.main:app --reload --port 8000
+  ```bash
+  export OPENAI_API_KEY="sk-..."  # On Windows: $env:OPENAI_API_KEY = "sk-..."
+  python main.py
+  # Or use uvicorn directly:
+  # python -m uvicorn main:app --reload --port 8000
   ```
 
 - The `OpenAIAdapter` calls the OpenAI chat completions endpoint using `httpx`.

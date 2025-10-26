@@ -5,18 +5,18 @@
 
 BASE_URL="http://localhost:8000/api"
 
-echo "======================================================================"
-echo "🧪 Testing Gemini Conversational API"
-echo "======================================================================"
+
+echo " Testing Gemini Conversational API"
+
 
 # Check if server is running
 echo -e "\n🔍 Checking if server is running..."
 if ! curl -s "${BASE_URL%/api}/health" > /dev/null 2>&1; then
-    echo "❌ Server is not running!"
+    echo "Server is not running!"
     echo "Start it with: cd backend && python main.py"
     exit 1
 fi
-echo "✅ Server is running"
+echo "Server is running"
 
 # Test 1: Start a conversation
 echo -e "\n======================================================================"
@@ -35,7 +35,7 @@ echo "$CONV_START" | python3 -m json.tool
 CONV_ID=$(echo "$CONV_START" | python3 -c "import sys, json; print(json.load(sys.stdin).get('conversation_id', ''))")
 
 if [ -z "$CONV_ID" ]; then
-    echo "❌ Failed to start conversation. Check if GOOGLE_AI_API_KEY is set."
+    echo "Failed to start conversation. Check if GOOGLE_AI_API_KEY is set."
     exit 1
 fi
 

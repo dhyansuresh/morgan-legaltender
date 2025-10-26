@@ -9,21 +9,36 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+import os
 
 from app.specialists.records_wrangler import RecordsWrangler
 from app.specialists.voice_scheduler import VoiceScheduler
 from app.specialists.evidence_sorter import EvidenceSorter
 from app.specialists.legal_researcher import LegalResearcher
 from app.specialists.client_communication import ClientCommunicator
+from app.specialists.gemini_adapter import GeminiAdapter
 
 router = APIRouter()
 
-# Initialize specialists
+# Initialize LLM adapter - prefer Gemini, fallback to mock
+def get_llm_adapter():
+    """Get the configured LLM adapter based on available API keys"""
+    google_api_key = os.getenv("GOOGLE_AI_API_KEY")
+
+    if google_api_key:
+        print("✓ Using Gemini as LLM provider")
+        return GeminiAdapter(api_key=google_api_key)
+
+    print("⚠ No AI API key found - using mock responses")
+    return None  # Will use mock adapter
+
+# Initialize specialists with Gemini
+llm_adapter = get_llm_adapter()
 records_wrangler = RecordsWrangler()
 voice_scheduler = VoiceScheduler()
 evidence_sorter = EvidenceSorter()
-legal_researcher = LegalResearcher()
-client_communicator = ClientCommunicator()
+legal_researcher = LegalResearcher(llm_adapter=llm_adapter)
+client_communicator = ClientCommunicator(llm_adapter=llm_adapter)
 
 
 # Request Models
