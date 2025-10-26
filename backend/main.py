@@ -12,11 +12,12 @@ load_dotenv()
 
 # Import routers
 from api.routers import (
-    router_endpoints, 
-    orchestrator_endpoints, 
-    specialist_endpoints, 
+    router_endpoints,
+    orchestrator_endpoints,
+    specialist_endpoints,
     communication_endpoints,
-    conversation_endpoints
+    conversation_endpoints,
+    document_endpoints
 )
 
 
@@ -120,6 +121,12 @@ app.include_router(
     conversation_endpoints.router,
     prefix="/api",
     tags=["Gemini Conversations"]
+)
+
+app.include_router(
+    document_endpoints.router,
+    prefix="/api/documents",
+    tags=["Document Processing"]
 )
 
 # Root endpoint
@@ -240,8 +247,8 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     reload = os.getenv("ENVIRONMENT", "development") == "development"
     
-    print(f"\n🚀 Starting server on {host}:{port}")
-    print(f"📚 Documentation: http://localhost:{port}/docs\n")
+    print(f"\nStarting server on {host}:{port}")
+    print(f"Documentation: http://localhost:{port}/docs\n")
     
     # Disable auto-reload to prevent .venv file watching issues
     # If you need auto-reload, manually restart the server after changes

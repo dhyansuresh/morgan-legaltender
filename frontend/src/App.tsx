@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Send, Mail, MessageSquare, BarChart3, Loader2 } from 'lucide-react'
+import { Send, Mail, MessageSquare, BarChart3, Loader2, FileText } from 'lucide-react'
 import TaskInput from './components/TaskInput'
 import ResultDisplay from './components/ResultDisplay'
 import EmailPanel from './components/EmailPanel'
 import SMSPanel from './components/SMSPanel'
 import AgentStatus from './components/AgentStatus'
+import DocumentUpload from './components/DocumentUpload'
 import { TaskRouteResponse } from './services/api'
 
-type TabType = 'task' | 'email' | 'sms' | 'stats'
+type TabType = 'task' | 'documents' | 'email' | 'sms' | 'stats'
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('task')
@@ -45,6 +46,17 @@ function App() {
           >
             <Send size={18} />
             <span>Task Assistant</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('documents')}
+            className={`flex items-center space-x-2 px-6 py-3 rounded-lg transition-all ${
+              activeTab === 'documents'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'text-slate-300 hover:bg-slate-700/50'
+            }`}
+          >
+            <FileText size={18} />
+            <span>Documents</span>
           </button>
           <button
             onClick={() => setActiveTab('email')}
@@ -94,6 +106,24 @@ function App() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="animate-spin text-blue-500" size={48} />
                 <span className="ml-4 text-slate-300 text-lg">Processing your request...</span>
+              </div>
+            )}
+            {!isLoading && result && (
+              <ResultDisplay result={result} />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'documents' && (
+          <div className="space-y-6">
+            <DocumentUpload
+              onResult={setResult}
+              onLoadingChange={setIsLoading}
+            />
+            {isLoading && (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="animate-spin text-blue-500" size={48} />
+                <span className="ml-4 text-slate-300 text-lg">Processing document...</span>
               </div>
             )}
             {!isLoading && result && (
