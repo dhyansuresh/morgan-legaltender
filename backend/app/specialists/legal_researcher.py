@@ -32,6 +32,16 @@ class LegalResearcher:
 
     def __init__(self, llm_adapter: LLMAdapter = None):
         self.llm = llm_adapter or MockLLMAdapter()
+        
+        # Set system instruction if using Gemini adapter
+        if self.llm and hasattr(self.llm, 'set_system_instruction'):
+            self.llm.set_system_instruction(
+                "You are an experienced legal researcher specializing in personal injury and negligence law. "
+                "Your role is to analyze case information, identify legal issues, find relevant precedents, "
+                "and provide clear, actionable legal analysis. Always cite specific laws, cases, or legal "
+                "principles when applicable. Be thorough but concise, focusing on practical next steps for "
+                "the legal team."
+            )
 
     def _extract_issues(self, text: str) -> List[str]:
         issues = set()
@@ -68,8 +78,22 @@ class LegalResearcher:
         else:
             suggested_actions.append("Flag for human review — not enough info to act")
 
-        # Use LLM adapter to draft a short research brief (mocked in tests)
-        prompt = f"Summarize key legal issues and next steps for the following text:\n\n{text}\n"
+        # Use LLM adapter to draft a detailed research brief
+        prompt = f"""You are an experienced legal researcher analyzing a case or legal situation.
+
+Context/Text to Analyze:
+{text}
+
+Please provide a comprehensive legal research brief that includes:
+
+1. **Key Legal Issues Identified**: List and explain the main legal issues present
+2. **Applicable Law & Precedents**: Mention relevant statutes, case law, or legal principles
+3. **Analysis**: Brief analysis of how the law applies to this situation
+4. **Recommended Next Steps**: Specific actions the legal team should take
+5. **Potential Risks/Challenges**: Any legal risks or challenges to be aware of
+
+Provide a thorough but concise analysis (3-5 paragraphs):"""
+
         brief = await self.llm.complete(prompt)
 
         return {

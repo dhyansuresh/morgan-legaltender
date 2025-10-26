@@ -29,8 +29,20 @@ class ClientCommunicator:
     - Output: CommunicationResponse with draft_message, subject, suggested_followups
     """
 
-    def __init__(self, llm_adapter: Optional[ClientCommAdapter] = None):
-        self.llm = llm_adapter or MockCommAdapter()
+    def __init__(self, llm_adapter=None):
+        # Accept any adapter with a complete() method (Gemini, OpenAI, or Mock)
+        self.llm = llm_adapter if llm_adapter else MockCommAdapter()
+        
+        # Set system instruction if using Gemini adapter
+        if self.llm and hasattr(self.llm, 'set_system_instruction'):
+            self.llm.set_system_instruction(
+                "You are an experienced legal assistant specializing in client communications for a personal "
+                "injury law firm. Your role is to draft clear, empathetic, and professional messages to clients. "
+                "Always maintain a warm but professional tone, avoid legal jargon unless necessary (and explain it "
+                "when used), show genuine concern for the client's wellbeing, provide clear next steps, and ensure "
+                "all communications comply with legal and ethical standards. Focus on building trust and keeping "
+                "clients informed about their case progress."
+            )
 
     def _suggest_subject(self, purpose: Optional[str], text: str) -> str:
         if purpose:
@@ -54,10 +66,22 @@ class ClientCommunicator:
         subject = self._suggest_subject(purpose, text)
         suggested_followups = self._suggest_followups(text)
 
-        prompt = (
-            f"Draft an empathetic, concise message to a client named {client_name or '[Client Name]'} "
-            f"about the following: {text}\nTone: empathetic. Keep it clear and actionable."
-        )
+        prompt = f"""You are an experienced legal assistant helping to draft clear, empathetic client communications.
+
+Client Name: {client_name or '[Client Name]'}
+Purpose: {purpose or 'general update'}
+Context: {text}
+
+Please draft a professional, empathetic email message to this client. The message should:
+1. Be warm and compassionate while maintaining professionalism
+2. Clearly address their concerns or questions
+3. Provide specific next steps or timeline when appropriate
+4. Use plain language (avoid excessive legal jargon)
+5. Be concise but thorough (2-4 paragraphs)
+6. Include an appropriate greeting and closing
+
+Draft the complete email message:"""
+
         brief = await self.llm.complete(prompt)
 
         return {
