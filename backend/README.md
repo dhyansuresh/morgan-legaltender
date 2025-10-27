@@ -1,4 +1,4 @@
-Backend AI specialist: Legal Researcher
+pipBackend AI specialist: Legal Researcher
 
 This folder contains a minimal FastAPI service implementing the Legal Researcher AI specialist.
 
